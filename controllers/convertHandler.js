@@ -21,11 +21,11 @@ function ConvertHandler() {
   
   // Extract unit from input string
   this.getUnit = function(input) {
-    const validUnits = ['gal', 'l', 'mi', 'km', 'lbs', 'kg'];
+    const validUnits = ['gal', 'L', 'mi', 'km', 'lbs', 'kg'];
     let unitString = input.match(/[a-zA-Z]+$/)[0]?.toLowerCase();
     
-    // Handle liter case (L or l)
-    if (unitString === 'l' || unitString === 'L') unitString = 'L';
+    // Normalize 'l' or 'L' to 'L'
+    if (unitString === 'l') unitString = 'L';
     
     return validUnits.includes(unitString) ? unitString : 'invalid unit';
   };
@@ -40,7 +40,7 @@ function ConvertHandler() {
       'lbs': 'kg',
       'kg': 'lbs'
     };
-    return unitPairs[initUnit.toLowerCase()] || 'invalid unit';
+    return unitPairs[initUnit] || 'invalid unit';
   };
 
   // Spell out unit in full
@@ -53,7 +53,7 @@ function ConvertHandler() {
       'lbs': 'pounds',
       'kg': 'kilograms'
     };
-    return unitNames[unit.toLowerCase()] || 'invalid unit';
+    return unitNames[unit] || 'invalid unit';
   };
   
   // Perform the conversion
@@ -67,11 +67,11 @@ function ConvertHandler() {
     }
     
     let result;
-    switch (initUnit.toLowerCase()) {
+    switch (initUnit) {
       case 'gal':
         result = initNum * galToL;
         break;
-      case 'l':
+      case 'L':
         result = initNum / galToL;
         break;
       case 'mi':
