@@ -5,66 +5,223 @@ const server = require('../server');
 
 chai.use(chaiHttp);
 
-suite('Functional Tests', function() {
-  test('Convert a valid input such as 10L: GET request to /api/convert', function(done) {
+suite('Functional Tests', function () {
+  let testProject = 'apitest';
+  let createdId;
+
+  // 1. Create an issue with every field
+  test('Create an issue with every field: POST request to /api/issues/{project}', function (done) {
     chai.request(server)
-      .get('/api/convert')
-      .query({ input: '10L' })
-      .end(function(err, res) {
+      .post(`/api/issues/${testProject}`)
+      .send({
+        issue_title: 'Test issue full',
+        issue_text: 'Functional test full fields',
+        created_by: 'Tester',
+        assigned_to: 'Dev',
+        status_text: 'In QA'
+      })
+      .end(function (err, res) {
         assert.equal(res.status, 200);
-        assert.equal(res.body.initNum, 10);
-        assert.equal(res.body.initUnit, 'L');
-        assert.approximately(res.body.returnNum, 2.64172, 0.00001);
-        assert.equal(res.body.returnUnit, 'gal');
-        assert.equal(res.body.string, '10 liters converts to 2.64172 gallons');
+        assert.equal(res.body.issue_title, 'Test issue full');
+        assert.equal(res.body.issue_text, 'Functional test full fields');
+        assert.equal(res.body.created_by, 'Tester');
+        assert.equal(res.body.assigned_to, 'Dev');
+        assert.equal(res.body.status_text, 'In QA');
+        assert.property(res.body, '_id');
+        createdId = res.body._id;
         done();
       });
   });
 
-  test('Convert an invalid input such as 32g: GET request to /api/convert', function(done) {
+  // 2. Create an issue with only required fields
+  test('Create an issue with only required fields', function (done) {
     chai.request(server)
-      .get('/api/convert')
-      .query({ input: '32g' })
-      .end(function(err, res) {
+      .post(`/api/issues/${testProject}`)
+      .send({
+        issue_title: 'Test required',
+        issue_text: 'Only required fields',
+        created_by: 'Tester'
+      })
+      .end(function (err, res) {
         assert.equal(res.status, 200);
-        assert.equal(res.body.error, 'invalid unit');
+        assert.equal(res.body.issue_title, 'Test required');
+        assert.equal(res.body.issue_text, 'Only required fields');
+        assert.equal(res.body.created_by, 'Tester');
+        assert.equal(res.body.assigned_to, '');
+        assert.equal(res.body.status_text, '');
+        assert.property(res.body, '_id');
         done();
       });
   });
 
-  test('Convert an invalid number such as 3/7.2/4kg: GET request to /api/convert', function(done) {
+  // 3. Create an issue with missing required fields
+  test('Create an issue with missing required fields', function (done) {
     chai.request(server)
-      .get('/api/convert')
-      .query({ input: '3/7.2/4kg' })
-      .end(function(err, res) {
+      .post(`/api/issues/${testProject}`)
+      .send({
+        issue_title: 'Missing fields'
+        // missing issue_text & created_by
+      })
+      .end(function (err, res) {
         assert.equal(res.status, 200);
-        assert.equal(res.body.error, 'invalid number');
+        assert.property(res.body, 'error');
+        assert.equal(res.body.error, 'required field(s) missing');
         done();
       });
   });
 
-  test('Convert an invalid number AND unit such as 3/7.2/4kilomegagram: GET request to /api/convert', function(done) {
+  // 4. View issues on a project
+  test('View issues on a project', function (done) {
     chai.request(server)
-      .get('/api/convert')
-      .query({ input: '3/7.2/4kilomegagram' })
-      .end(function(err, res) {
+      .get(`/api/issues/${testProject}`)
+      .end(function (err, res) {
         assert.equal(res.status, 200);
-        assert.equal(res.body.error, 'invalid number and unit');
+        assert.isArray(res.body);
+        assert.property(res.body[0], 'issue_title');
         done();
       });
   });
 
-  test('Convert with no number such as kg: GET request to /api/convert', function(done) {
+  // 5. View issues on a project with one filter
+  test('View issues on a project with one filter', function (done) {
     chai.request(server)
-      .get('/api/convert')
-      .query({ input: 'kg' })
-      .end(function(err, res) {
+      .get(`/api/issues/${testProject}`)
+      .query({ created_by: 'Tester' })
+      .end(function (err, res) {
         assert.equal(res.status, 200);
-        assert.equal(res.body.initNum, 1);
-        assert.equal(res.body.initUnit, 'kg');
-        assert.approximately(res.body.returnNum, 2.20462, 0.00001);
-        assert.equal(res.body.returnUnit, 'lbs');
-        assert.equal(res.body.string, '1 kilograms converts to 2.20462 pounds');
+        res.body.forEach(issue => {
+          assert.equal(issue.created_by, 'Tester');
+        });
+        done();
+      });
+  });
+
+  // 6. View issues on a project with multiple filters
+  test('View issues on a project with multiple filters', function (done) {
+    chai.request(server)
+      .get(`/api/issues/${testProject}`)
+      .query({ created_by: 'Tester', assigned_to: 'Dev' })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        res.body.forEach(issue => {
+          assert.equal(issue.created_by, 'Tester');
+          assert.equal(issue.assigned_to, 'Dev');
+        });
+        done();
+      });
+  });
+
+  // 7. Update one field on an issue
+  test('Update one field on an issue', function (done) {
+    chai.request(server)
+      .put(`/api/issues/${testProject}`)
+      .send({
+        _id: createdId,
+        issue_text: 'Updated text'
+      })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.equal(res.body.result, 'successfully updated');
+        assert.equal(res.body._id, createdId);
+        done();
+      });
+  });
+
+  // 8. Update multiple fields on an issue
+  test('Update multiple fields on an issue', function (done) {
+    chai.request(server)
+      .put(`/api/issues/${testProject}`)
+      .send({
+        _id: createdId,
+        issue_title: 'Updated title',
+        status_text: 'Resolved'
+      })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.equal(res.body.result, 'successfully updated');
+        done();
+      });
+  });
+
+  // 9. Update an issue with missing _id
+  test('Update an issue with missing _id', function (done) {
+    chai.request(server)
+      .put(`/api/issues/${testProject}`)
+      .send({
+        issue_title: 'No ID'
+      })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.property(res.body, 'error');
+        assert.equal(res.body.error, 'missing _id');
+        done();
+      });
+  });
+
+  // 10. Update an issue with no fields to update
+  test('Update an issue with no fields to update', function (done) {
+    chai.request(server)
+      .put(`/api/issues/${testProject}`)
+      .send({
+        _id: createdId
+      })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.property(res.body, 'error');
+        assert.equal(res.body.error, 'no update field(s) sent');
+        done();
+      });
+  });
+
+  // 11. Update an issue with an invalid _id
+  test('Update an issue with an invalid _id', function (done) {
+    chai.request(server)
+      .put(`/api/issues/${testProject}`)
+      .send({
+        _id: 'invalidid12345',
+        issue_title: 'Should fail'
+      })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.property(res.body, 'error');
+        assert.equal(res.body.error, 'could not update');
+        done();
+      });
+  });
+
+  // 12. Delete an issue
+  test('Delete an issue', function (done) {
+    chai.request(server)
+      .delete(`/api/issues/${testProject}`)
+      .send({ _id: createdId })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.equal(res.body.result, 'successfully deleted');
+        assert.equal(res.body._id, createdId);
+        done();
+      });
+  });
+
+  // 13. Delete an issue with an invalid _id
+  test('Delete an issue with an invalid _id', function (done) {
+    chai.request(server)
+      .delete(`/api/issues/${testProject}`)
+      .send({ _id: 'invalidid12345' })
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.equal(res.body.error, 'could not delete');
+        done();
+      });
+  });
+
+  // 14. Delete an issue with missing _id
+  test('Delete an issue with missing _id', function (done) {
+    chai.request(server)
+      .delete(`/api/issues/${testProject}`)
+      .send({})
+      .end(function (err, res) {
+        assert.equal(res.status, 200);
+        assert.equal(res.body.error, 'missing _id');
         done();
       });
   });
